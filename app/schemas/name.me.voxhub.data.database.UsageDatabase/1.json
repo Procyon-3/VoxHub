@@ -1,0 +1,102 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "b2af9f89abee1d848abb6d911294c41b",
+    "entities": [
+      {
+        "tableName": "synthesis_requests",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `providerId` TEXT, `configId` TEXT, `configName` TEXT NOT NULL, `source` TEXT NOT NULL, `textCharacters` INTEGER NOT NULL, `outcome` TEXT NOT NULL, `firstAudioMillis` INTEGER, `totalMillis` INTEGER, `failure` TEXT, `failureStage` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "configId",
+            "columnName": "configId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "configName",
+            "columnName": "configName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textCharacters",
+            "columnName": "textCharacters",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstAudioMillis",
+            "columnName": "firstAudioMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "totalMillis",
+            "columnName": "totalMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "failure",
+            "columnName": "failure",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "failureStage",
+            "columnName": "failureStage",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_synthesis_requests_startedAt",
+            "unique": false,
+            "columnNames": [
+              "startedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_synthesis_requests_startedAt` ON `${TABLE_NAME}` (`startedAt`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b2af9f89abee1d848abb6d911294c41b')"
+    ]
+  }
+}

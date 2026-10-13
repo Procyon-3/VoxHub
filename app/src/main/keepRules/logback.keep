@@ -1,0 +1,26 @@
+# Logback registers converters via Class.getName() and constructs them reflectively.
+# Preserve their public no-arg constructors while allowing class-name obfuscation.
+# These match DiagnosticTree's %date, %level, %thread, %logger, %msg and %n pattern.
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.DateConverter {
+    public <init>();
+}
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.LevelConverter {
+    public <init>();
+}
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.ThreadConverter {
+    public <init>();
+}
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.LoggerConverter {
+    public <init>();
+}
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.MessageConverter {
+    public <init>();
+}
+-keep,allowobfuscation class ch.qos.logback.classic.pattern.LineSeparatorConverter {
+    public <init>();
+}
+
+# FixedWindowRollingPolicy parses DiagnosticTree's application.%i.log pattern.
+-keep,allowobfuscation class ch.qos.logback.core.rolling.helper.IntegerTokenConverter {
+    public <init>();
+}

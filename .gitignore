@@ -1,0 +1,54 @@
+# Gradle / Android generated files
+.gradle/
+.gradle-user-home/
+.android-user-home/
+.kotlin/
+build/
+**/build/
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Local SDK and tooling
+local.properties
+.jdk/
+.idea/
+*.iml
+.vscode/
+.agents/
+.aws/
+.codex/
+
+# Local signing configuration and private key material
+/keystore.properties
+/signing/
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Build outputs and local diagnostics
+*.apk
+*.aab
+*.apks
+*.log
+*.hprof
+
+# Editor / OS temporary files
+*.swp
+*.swo
+*.kate-swp
+*~
+.DS_Store
+Thumbs.db
+
+# Machine-specific assistant instructions
+AGENTS.md
+CLAUDE.md
