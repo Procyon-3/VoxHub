@@ -33,18 +33,8 @@ class TtsEngine(
                 while (true) {
                     coroutineContext.ensureActive()
                     val count = stream.read(buffer)
-                    when {
-                        count == -1 -> break
-                        count == 0 -> throw TtsException(
-                            TtsFailure.SYNTHESIS,
-                            TtsDiagnostic(stage = TtsStage.STREAM_READ, reasonCode = "ZERO_LENGTH_READ"),
-                        )
-                        count < -1 || count > buffer.size -> throw TtsException(
-                            TtsFailure.SYNTHESIS,
-                            TtsDiagnostic(stage = TtsStage.STREAM_READ, reasonCode = "INVALID_READ_COUNT"),
-                        )
-                        else -> sink.write(buffer, 0, count)
-                    }
+                    if (count == -1) break
+                    sink.write(buffer, 0, count)
                 }
             }
             sink.complete()
@@ -61,10 +51,10 @@ class TtsEngine(
     }
 
     private fun validate(request: TtsRequest) {
-        if (request.locale !in provider.voices.map { it.locale }.toSet()) {
+        if (provider.voices.none { it.locale == request.locale }) {
             throw invalidRequest("UNSUPPORTED_LOCALE")
         }
-        if (request.voiceId !in provider.voices.map { it.id }.toSet()) {
+        if (provider.voices.none { it.id == request.voiceId }) {
             throw invalidRequest("UNKNOWN_VOICE")
         }
     }

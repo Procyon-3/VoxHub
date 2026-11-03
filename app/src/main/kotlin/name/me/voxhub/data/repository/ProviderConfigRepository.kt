@@ -93,7 +93,7 @@ class ProviderConfigRepository(
                 is ProviderSettings.Clone -> {
                     require(record.providerId == VOICECLONE_DESCRIPTOR.id)
                     require(UUID.fromString(settings.audioVersion).toString() == settings.audioVersion)
-                    require(settings.mimeType in setOf("audio/wav", "audio/mpeg") && settings.audioSize in 1..7_500_000)
+                    require(settings.mimeType in setOf("audio/wav", "audio/mpeg") && settings.audioSize > 0)
                 }
             }
             Entry(config, requireNotNull(credentialCipher.decryptOrNull(config.encryptedApiKey)) { "Provider credential unavailable" })

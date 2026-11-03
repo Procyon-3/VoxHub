@@ -60,19 +60,61 @@ class MimoSsePcmStreamTest {
         }
     }
 
+    @Test fun unknownSseFieldsDoNotInterruptAudio() = runBlocking {
+        val events = ": heartbeat\ntrace_id: test\nping\ntimestamp: 123\n\n" +
+            "event: audio\nid: 1\nretry: 1000\ntrace_id: test\n" +
+            "data: {\"choices\":[{\"delta\":{\"audio\":{\"data\":\"AAA=\"}}}]}\n\n"
+        for (protocol in MimoStreamProtocol.entries) {
+            withEvents(protocol, events) { stream ->
+                val bytes = ByteArray(8192)
+                assertEquals(2, stream.read(bytes))
+                assertEquals(-1, stream.read(bytes))
+            }
+        }
+    }
+
+    @Test fun optionalEventsAreSkippedButWrongAudioTypesFail() = runBlocking {
+        val events = "data: {}\n\n" +
+            "data: {\"choices\":[{\"delta\":null}]}\n\n" +
+            "data: {\"choices\":[{\"delta\":{\"audio\":null}}]}\n\n" +
+            "data: {\"choices\":[{\"delta\":{\"audio\":{\"data\":null}}}]}\n\n"
+        for (protocol in MimoStreamProtocol.entries) {
+            for (invalidData in listOf("42", "true", "{}", "[]")) {
+                withEvents(
+                    protocol,
+                    events + "data: {\"choices\":[{\"delta\":{\"audio\":{\"data\":$invalidData}}}]}\n\n",
+                ) { stream ->
+                    try {
+                        stream.read(ByteArray(8192))
+                        fail("Wrong audio types must not be silently skipped")
+                    } catch (error: TtsException) {
+                        assertEquals("INVALID_SSE_STRUCTURE", error.error.diagnostic?.reasonCode)
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun withStream(
         protocol: MimoStreamProtocol,
         audio: String,
+        block: suspend (MimoSsePcmStream) -> Unit,
+    ) = withEvents(
+        protocol,
+        "data: {\"extra\":true,\"choices\":[{\"extra\":{},\"delta\":{\"extra\":[],\"audio\":{\"data\":\"$audio\",\"extra\":null}}}]}\n\n",
+        block,
+    )
+
+    private suspend fun withEvents(
+        protocol: MimoStreamProtocol,
+        events: String,
         block: suspend (MimoSsePcmStream) -> Unit,
     ) {
         val request = Request.Builder().url("https://example.com/tts").build()
         val client = OkHttpClient()
         val response = Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
             .code(200).message("OK").body("".toResponseBody()).build()
-        val source = Buffer().writeUtf8(
-            "data: {\"extra\":true,\"choices\":[{\"extra\":{},\"delta\":{\"extra\":[],\"audio\":{\"data\":\"$audio\",\"extra\":null}}}]}\n\n" +
-                "data: [DONE]\n\n",
-        )
+        val source = Buffer().writeUtf8(events + "data: [DONE]\n\n")
         val executor = Executors.newSingleThreadExecutor()
         val stream = MimoSsePcmStream(client.newCall(request), response, source,
             PcmFormat(24_000, 1, PcmEncoding.S16_LE), executor, protocol)

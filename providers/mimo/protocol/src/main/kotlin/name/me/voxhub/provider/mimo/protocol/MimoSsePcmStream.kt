@@ -11,11 +11,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import name.me.voxhub.core.tts.PcmFormat
 import name.me.voxhub.core.tts.PcmStream
@@ -133,14 +132,10 @@ class MimoSsePcmStream(
             if (line.startsWith(":")) continue
             val field = line.substringBefore(':')
             val value = line.substringAfter(':', "").removePrefix(" ")
-            when (field) {
-                "data" -> {
-                    if (hasData) data.append('\n')
-                    data.append(value)
-                    hasData = true
-                }
-                "event", "id", "retry" -> Unit
-                else -> throw malformedStream()
+            if (field == "data") {
+                if (hasData) data.append('\n')
+                data.append(value)
+                hasData = true
             }
         }
         throw CancellationException("MiMo stream was closed")
@@ -166,30 +161,25 @@ class MimoSsePcmStream(
     }
 }
 
-private fun JsonObject.audioDataOrNull(): String? {
-    val choicesElement = this["choices"] ?: return null
-    val choices = choicesElement as? JsonArray
-        ?: throw malformedStream()
-    val choiceElement = choices.firstOrNull() ?: return null
-    val choice = choiceElement as? JsonObject
-        ?: throw malformedStream()
-    val deltaElement = choice["delta"] ?: return null
-    if (deltaElement is JsonNull) return null
-    val delta = deltaElement as? JsonObject
-        ?: throw malformedStream()
-    val audioElement = delta["audio"] ?: return null
-    if (audioElement is JsonNull) return null
-    val audio = audioElement as? JsonObject
-        ?: throw malformedStream()
-    val dataElement = audio["data"] ?: return null
-    if (dataElement is JsonNull) return null
-    val data = dataElement as? JsonPrimitive
-        ?: throw malformedStream()
-    if (!data.isString) {
-        throw malformedStream()
-    }
-    return data.content
+private fun JsonObject.audioDataOrNull(): String? = try {
+    STREAM_JSON.decodeFromJsonElement<AudioEvent>(this).choices.firstOrNull()?.delta?.audio?.data
+} catch (_: SerializationException) {
+    throw malformedStream()
 }
+
+@Serializable
+private data class AudioEvent(val choices: List<AudioChoice> = emptyList())
+
+@Serializable
+private data class AudioChoice(val delta: AudioDelta? = null)
+
+@Serializable
+private data class AudioDelta(val audio: AudioData? = null)
+
+@Serializable
+private data class AudioData(val data: String? = null)
+
+private val STREAM_JSON = Json { ignoreUnknownKeys = true }
 
 private fun Exception.toTtsException(protocol: MimoStreamProtocol): Exception = when (this) {
     is TtsException -> this

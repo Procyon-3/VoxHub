@@ -94,7 +94,7 @@
     <string name="reference_loading">正在读取</string>
     <string name="reference_preview">试听参考音频</string>
     <string name="reference_stop">停止试听</string>
-    <string name="reference_formats">支持 MP3、WAV；编码后大小不超过 10 MB。建议参考音频与待合成文本使用相同语言，以获得更好的音色克隆效果。</string>
+    <string name="reference_formats">支持 MP3、WAV。建议参考音频与待合成文本使用相同语言，以获得更好的音色克隆效果。</string>
     <string name="clone_style_instruction">风格指令（可选）</string>
     <string name="reference_import_failed">无法导入：请选择有效的 MP3 或 WAV，并检查文件大小。</string>
     <string name="reference_load_failed">参考音频读取失败，请重新选择。</string>

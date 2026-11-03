@@ -20,6 +20,7 @@ import name.me.voxhub.provider.mimo.protocol.MIMO_API_ENDPOINT
 import name.me.voxhub.provider.mimo.protocol.MimoSsePcmStream
 import name.me.voxhub.provider.mimo.protocol.MimoStreamProtocol
 import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
+import name.me.voxhub.provider.mimo.protocol.mimoApiKey
 import name.me.voxhub.provider.mimo.protocol.protocolError
 import name.me.voxhub.provider.mimo.protocol.requireSseBody
 import okhttp3.HttpUrl
@@ -62,10 +63,6 @@ internal class MimoTtsProvider(
     override val voices: List<TtsVoice> = MIMO_VOICES
 
     override suspend fun openPcmStream(request: TtsRequest): PcmStream {
-        validateRequest(request)
-        if (apiKey.isBlank()) {
-            throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "MISSING_CREDENTIAL")
-        }
         val upstreamVoice = VOICE_MAPPINGS.first { it.localId == request.voiceId }.upstreamName
         val requestBody = buildRequestBody(request.text, upstreamVoice)
             .toString()
@@ -73,7 +70,7 @@ internal class MimoTtsProvider(
         val call = client.newCall(
             Request.Builder()
                 .url(endpoint)
-                .header(API_KEY_HEADER, apiKey)
+                .mimoApiKey(apiKey)
                 .header("Accept", EVENT_STREAM_MEDIA_TYPE)
                 .post(requestBody)
                 .build(),
@@ -100,20 +97,7 @@ internal class MimoTtsProvider(
         )
     }
 
-    private fun validateRequest(request: TtsRequest) {
-        if (request.text.isEmpty()) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "EMPTY_TEXT")
-        }
-        if (request.locale !in MIMO_SUPPORTED_LOCALES) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNSUPPORTED_LOCALE")
-        }
-        if (VOICE_MAPPINGS.none { it.localId == request.voiceId }) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNKNOWN_VOICE")
-        }
-    }
-
     private companion object {
-        const val API_KEY_HEADER = "api-key"
         const val EVENT_STREAM_MEDIA_TYPE = "text/event-stream"
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         fun buildRequestBody(text: String, upstreamVoice: String) = buildJsonObject {
@@ -142,7 +126,6 @@ private data class VoiceMapping(
 
 val MIMO_ZH_CN_LOCALE = LocaleTag("zh-CN")
 val MIMO_EN_US_LOCALE = LocaleTag("en-US")
-private val MIMO_SUPPORTED_LOCALES = setOf(MIMO_ZH_CN_LOCALE, MIMO_EN_US_LOCALE)
 
 private val VOICE_MAPPINGS = listOf(
     VoiceMapping("mimo/zh-CN-bingtang", "冰糖", "冰糖", MIMO_ZH_CN_LOCALE),

@@ -44,7 +44,6 @@ class ReferenceAudioImporter(private val context: Context) {
                 currentCoroutineContext().ensureActive()
                 val count = input.read(buffer)
                 if (count < 0) break
-                require(output.size() + count <= 7_500_000)
                 output.write(buffer, 0, count)
             }
             output.toByteArray()

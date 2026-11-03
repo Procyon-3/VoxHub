@@ -22,6 +22,7 @@ import name.me.voxhub.provider.mimo.protocol.MIMO_API_ENDPOINT
 import name.me.voxhub.provider.mimo.protocol.MimoSsePcmStream
 import name.me.voxhub.provider.mimo.protocol.MimoStreamProtocol
 import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
+import name.me.voxhub.provider.mimo.protocol.mimoApiKey
 import name.me.voxhub.provider.mimo.protocol.protocolError
 import name.me.voxhub.provider.mimo.protocol.requireSseBody
 import okhttp3.HttpUrl
@@ -38,8 +39,7 @@ class ReferenceAudio(bytes: ByteArray, val mimeType: String) {
     val size: Int get() = content.size
     init {
         require(mimeType == "audio/wav" || mimeType == "audio/mpeg")
-        require(content.isNotEmpty() && content.size <= 7_500_000)
-        require(4L * ((content.size + 2L) / 3L) + "data:$mimeType;base64,".length <= 10_000_000L)
+        require(content.isNotEmpty())
     }
     fun copyBytes(): ByteArray = content.copyOf()
     internal fun dataUrl(): String = "data:$mimeType;base64," + content.toByteString().base64()
@@ -80,13 +80,6 @@ internal class VoiceCloneTtsProvider(
     override val voices: List<TtsVoice> = VOICECLONE_VOICES
 
     override suspend fun openPcmStream(request: TtsRequest): PcmStream {
-        validateRequest(request)
-        if (apiKey.isBlank()) {
-            throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "MISSING_CREDENTIAL")
-        }
-        if (apiKey.any { it.code !in 32..126 }) {
-            throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "INVALID_CREDENTIAL")
-        }
         val requestBody = withContext(Dispatchers.Default) {
             buildRequestBody(request.text, styleInstruction, referenceAudio)
                 .toString()
@@ -95,7 +88,7 @@ internal class VoiceCloneTtsProvider(
         val call = client.newCall(
             Request.Builder()
                 .url(endpoint)
-                .header(API_KEY_HEADER, apiKey)
+                .mimoApiKey(apiKey)
                 .header("Accept", EVENT_STREAM_MEDIA_TYPE)
                 .post(requestBody)
                 .build(),
@@ -122,20 +115,7 @@ internal class VoiceCloneTtsProvider(
         )
     }
 
-    private fun validateRequest(request: TtsRequest) {
-        if (request.text.isEmpty()) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "EMPTY_TEXT")
-        }
-        if (request.locale !in VOICECLONE_SUPPORTED_LOCALES) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNSUPPORTED_LOCALE")
-        }
-        if (VOICECLONE_VOICES.none { it.id == request.voiceId }) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNKNOWN_VOICE")
-        }
-    }
-
     private companion object {
-        const val API_KEY_HEADER = "api-key"
         const val EVENT_STREAM_MEDIA_TYPE = "text/event-stream"
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         fun buildRequestBody(text: String, prompt: String, audio: ReferenceAudio) = buildJsonObject {
@@ -161,7 +141,6 @@ internal class VoiceCloneTtsProvider(
 
 val VOICECLONE_ZH_CN_LOCALE = LocaleTag("zh-CN")
 val VOICECLONE_EN_US_LOCALE = LocaleTag("en-US")
-private val VOICECLONE_SUPPORTED_LOCALES = setOf(VOICECLONE_ZH_CN_LOCALE, VOICECLONE_EN_US_LOCALE)
 val VOICECLONE_VOICES = listOf(
     TtsVoice("mimo-voiceclone/zh-CN-cloned", "克隆音色", VOICECLONE_ZH_CN_LOCALE),
     TtsVoice("mimo-voiceclone/en-US-cloned", "克隆音色", VOICECLONE_EN_US_LOCALE),

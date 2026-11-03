@@ -20,6 +20,7 @@ import name.me.voxhub.provider.mimo.protocol.MIMO_API_ENDPOINT
 import name.me.voxhub.provider.mimo.protocol.MimoSsePcmStream
 import name.me.voxhub.provider.mimo.protocol.MimoStreamProtocol
 import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
+import name.me.voxhub.provider.mimo.protocol.mimoApiKey
 import name.me.voxhub.provider.mimo.protocol.protocolError
 import name.me.voxhub.provider.mimo.protocol.requireSseBody
 import okhttp3.HttpUrl
@@ -64,13 +65,6 @@ internal class VoiceDesignTtsProvider(
     override val voices: List<TtsVoice> = VOICEDESIGN_VOICES
 
     override suspend fun openPcmStream(request: TtsRequest): PcmStream {
-        validateRequest(request)
-        if (apiKey.isBlank()) {
-            throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "MISSING_CREDENTIAL")
-        }
-        if (apiKey.any { it.code !in 32..126 }) {
-            throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "INVALID_CREDENTIAL")
-        }
         if (voiceDesignPrompt.isBlank()) throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "MISSING_VOICE_DESIGN_PROMPT")
         val requestBody = buildRequestBody(request.text, voiceDesignPrompt)
             .toString()
@@ -78,7 +72,7 @@ internal class VoiceDesignTtsProvider(
         val call = client.newCall(
             Request.Builder()
                 .url(endpoint)
-                .header(API_KEY_HEADER, apiKey)
+                .mimoApiKey(apiKey)
                 .header("Accept", EVENT_STREAM_MEDIA_TYPE)
                 .post(requestBody)
                 .build(),
@@ -105,20 +99,7 @@ internal class VoiceDesignTtsProvider(
         )
     }
 
-    private fun validateRequest(request: TtsRequest) {
-        if (request.text.isEmpty()) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "EMPTY_TEXT")
-        }
-        if (request.locale !in VOICEDESIGN_SUPPORTED_LOCALES) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNSUPPORTED_LOCALE")
-        }
-        if (VOICEDESIGN_VOICES.none { it.id == request.voiceId }) {
-            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "UNKNOWN_VOICE")
-        }
-    }
-
     private companion object {
-        const val API_KEY_HEADER = "api-key"
         const val EVENT_STREAM_MEDIA_TYPE = "text/event-stream"
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         fun buildRequestBody(text: String, prompt: String) = buildJsonObject {
@@ -144,7 +125,6 @@ internal class VoiceDesignTtsProvider(
 
 val VOICEDESIGN_ZH_CN_LOCALE = LocaleTag("zh-CN")
 val VOICEDESIGN_EN_US_LOCALE = LocaleTag("en-US")
-private val VOICEDESIGN_SUPPORTED_LOCALES = setOf(VOICEDESIGN_ZH_CN_LOCALE, VOICEDESIGN_EN_US_LOCALE)
 val VOICEDESIGN_VOICES = listOf(
     TtsVoice("mimo-voicedesign/zh-CN-designed", "设计音色", VOICEDESIGN_ZH_CN_LOCALE),
     TtsVoice("mimo-voicedesign/en-US-designed", "设计音色", VOICEDESIGN_EN_US_LOCALE),

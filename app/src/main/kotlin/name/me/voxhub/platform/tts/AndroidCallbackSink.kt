@@ -20,8 +20,8 @@ internal class AndroidCallbackSink(
     private val callback: SynthesisCallback,
 ) : AudioSink {
     private var state = CallbackState.NEW
-    private var frameSize = 0
-    private var pending = ByteArray(0)
+    private var pendingByte: Byte? = null
+    private var chunkLimit = 0
     private val lock = Any()
 
     override suspend fun start(format: PcmFormat) = synchronized(lock) {
@@ -30,9 +30,8 @@ internal class AndroidCallbackSink(
             terminateWithError(TextToSpeech.ERROR_SYNTHESIS)
             throw outputFailure("UNSUPPORTED_PCM_FORMAT")
         }
-        frameSize = format.bytesPerFrame
-        val maxAligned = alignedMaximum()
-        if (maxAligned < frameSize) {
+        chunkLimit = callback.maxBufferSize - (callback.maxBufferSize % PCM_FRAME_SIZE)
+        if (chunkLimit < PCM_FRAME_SIZE) {
             terminateWithError(TextToSpeech.ERROR_OUTPUT)
             throw outputFailure("INVALID_CALLBACK_BUFFER")
         }
@@ -50,41 +49,25 @@ internal class AndroidCallbackSink(
         if (length == 0) return@synchronized
 
         var position = offset
-        var remaining = length
-        val chunkLimit = alignedMaximum()
+        val end = offset + length
 
-        if (pending.isNotEmpty()) {
-            val needed = frameSize - pending.size
-            if (remaining < needed) {
-                pending += bytes.copyOfRange(position, position + remaining)
-                return@synchronized
-            }
-            val frame = ByteArray(frameSize)
-            pending.copyInto(frame)
-            bytes.copyInto(frame, pending.size, position, position + needed)
-            send(frame, 0, frame.size)
-            pending = ByteArray(0)
-            position += needed
-            remaining -= needed
+        pendingByte?.let {
+            send(byteArrayOf(it, bytes[position++]), 0, PCM_FRAME_SIZE)
+            pendingByte = null
         }
 
-        val completeLength = remaining - (remaining % frameSize)
-        var sent = 0
-        while (sent < completeLength) {
-            val count = minOf(chunkLimit, completeLength - sent)
-            send(bytes, position + sent, count)
-            sent += count
+        val alignedEnd = end - (end - position) % PCM_FRAME_SIZE
+        while (position < alignedEnd) {
+            val count = minOf(chunkLimit, alignedEnd - position)
+            send(bytes, position, count)
+            position += count
         }
-        position += completeLength
-        remaining -= completeLength
-        if (remaining > 0) {
-            pending = bytes.copyOfRange(position, position + remaining)
-        }
+        if (position < end) pendingByte = bytes[position]
     }
 
     override suspend fun complete() = synchronized(lock) {
         if (state == CallbackState.TERMINAL) throw CallbackTerminatedException()
-        if (state != CallbackState.STARTED || pending.isNotEmpty()) {
+        if (state != CallbackState.STARTED || pendingByte != null) {
             terminateWithError(TextToSpeech.ERROR_SYNTHESIS)
             throw outputFailure("INCOMPLETE_PCM_OUTPUT")
         }
@@ -102,12 +85,9 @@ internal class AndroidCallbackSink(
         terminateWithError(error.failure.toAndroidError())
     }
 
-    private fun alignedMaximum(): Int = callback.maxBufferSize - (callback.maxBufferSize % frameSize)
-
     private fun send(bytes: ByteArray, offset: Int, length: Int) {
         if (callback.audioAvailable(bytes, offset, length) != TextToSpeech.SUCCESS) {
             state = CallbackState.TERMINAL
-            pending = ByteArray(0)
             throw CallbackTerminatedException()
         }
     }
@@ -115,8 +95,11 @@ internal class AndroidCallbackSink(
     private fun terminateWithError(errorCode: Int) {
         if (state == CallbackState.TERMINAL) return
         state = CallbackState.TERMINAL
-        pending = ByteArray(0)
         callback.error(errorCode)
+    }
+
+    private companion object {
+        const val PCM_FRAME_SIZE = 2
     }
 }
 

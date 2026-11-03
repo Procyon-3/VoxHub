@@ -7,6 +7,7 @@ import name.me.voxhub.core.tts.TtsException
 import name.me.voxhub.core.tts.TtsFailure
 import name.me.voxhub.core.tts.TtsStage
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Response
 
 fun createMimoHttpClient(requestTimeoutMillis: Long): OkHttpClient = OkHttpClient.Builder()
@@ -16,6 +17,17 @@ fun createMimoHttpClient(requestTimeoutMillis: Long): OkHttpClient = OkHttpClien
     .writeTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
     .callTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
     .build()
+
+fun Request.Builder.mimoApiKey(apiKey: String): Request.Builder {
+    if (apiKey.isBlank()) {
+        throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "MISSING_CREDENTIAL")
+    }
+    return try {
+        header("api-key", apiKey)
+    } catch (_: IllegalArgumentException) {
+        throw protocolError(TtsFailure.SERVICE, TtsStage.REQUEST_VALIDATION, "INVALID_CREDENTIAL")
+    }
+}
 
 private fun Int.toFailure(): TtsFailure = when (this) {
     400 -> TtsFailure.INVALID_REQUEST
