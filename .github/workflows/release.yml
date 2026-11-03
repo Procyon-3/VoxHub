@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate release version
+        shell: python
+        run: |
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ['GITHUB_REF_NAME']
+          if not re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', tag):
+              raise SystemExit('Expected a stable SemVer tag, such as v1.0.1')
+          properties = dict(
+              line.split('=', 1)
+              for line in Path('gradle.properties').read_text().splitlines()
+              if line.strip() and not line.lstrip().startswith('#')
+          )
+          if tag != 'v' + properties['appVersionName']:
+              raise SystemExit('Tag does not match appVersionName in gradle.properties')
+          if not 0 < int(properties['appVersionCode']) <= 2_100_000_000:
+              raise SystemExit('appVersionCode must be a positive Android version code')
+          print(f'Validated {tag}, versionCode={properties["appVersionCode"]}')
+
+  check:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+          cache-read-only: true
+      - name: Restore release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_SIGNING_PROPERTIES: ${{ secrets.ANDROID_SIGNING_PROPERTIES }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_SIGNING_PROPERTIES"
+          mkdir -p signing
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > signing/release.p12
+          printf '%s\n' "$ANDROID_SIGNING_PROPERTIES" > keystore.properties
+          chmod 600 signing/release.p12 keystore.properties
+      - name: Build release APK
+        run: ./gradlew --no-daemon --console=plain :app:assembleRelease
+      - name: Verify APK and generate checksum
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          apk="VoxHub-${version}-release.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "app/build/outputs/apk/release/$apk"
+          cd app/build/outputs/apk/release
+          sha256sum "$apk" > "$apk.sha256"
+      - name: Upload R8 mapping
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: r8-mapping-${{ github.ref_name }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            app/build/outputs/apk/release/*.apk \
+            app/build/outputs/apk/release/*.sha256 \
+            --verify-tag --generate-notes --title "VoxHub $GITHUB_REF_NAME"
+      - name: Clean up signing files
+        if: always()
+        run: rm -f keystore.properties signing/release.p12
