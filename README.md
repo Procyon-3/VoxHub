@@ -47,8 +47,6 @@ A：部分系统采用较为严格的后台管理策略，VoxHub 的服务可能
 
 ## 本地构建
 
-构建需要 JDK 25 和 Android SDK 37，使用仓库自带的 Gradle Wrapper。
-
 可直接构建 Debug 版本：
 ```bash
 # 克隆仓库
@@ -57,35 +55,6 @@ cd VoxHub
 # 使用 Gradle 编译 Debug APK
 ./gradlew assembleDebug
 ```
-
-## CI 与发布
-
-Pull Request 和 `main` 分支提交会自动执行协议测试、应用单元测试、Android Lint 和 Debug 构建。
-
-版本号统一在 `gradle.properties` 中维护：`appVersionName` 使用语义化版本号，`appVersionCode` 每次发布递增，保证 Android 可以覆盖升级。
-
-发布流程：
-
-1. 更新 `appVersionName` 和 `appVersionCode`，提交并等待 CI 通过。
-2. 为该提交创建并推送正式版本 Tag，例如：
-
-   ```bash
-   git tag -a v1.0.1 -m "Release 1.0.1"
-   git push origin v1.0.1
-   ```
-
-3. Release 工作流校验 Tag 与版本配置一致，重新执行 CI，构建并验证签名 APK，自动创建 GitHub Release，上传 APK 和 SHA-256 校验文件。R8 映射保存为 Actions Artifact。
-
-目前接受 `v主版本.次版本.修订号` 格式的正式版本，例如 `v1.0.1`；预发布版本尚未启用。
-
-仓库需配置以下 Actions Secrets，且后续版本必须沿用同一发布证书：
-
-| Secret | 内容 |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | PKCS#12 发布证书文件的 Base64 内容 |
-| `ANDROID_SIGNING_PROPERTIES` | 完整的 `keystore.properties` 内容，参考 `keystore.properties.example`，其中 `storeFile=signing/release.p12` |
-
-日常 CI 不使用签名 Secrets。仅 Release 构建恢复签名文件，完成后清理。
 
 ## 开源许可证
 
