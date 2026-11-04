@@ -10,13 +10,16 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 
-fun createMimoHttpClient(requestTimeoutMillis: Long): OkHttpClient = OkHttpClient.Builder()
-    .retryOnConnectionFailure(false)
-    .connectTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
-    .readTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
-    .writeTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
-    .callTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
-    .build()
+fun createMimoHttpClient(requestTimeoutMillis: Long): OkHttpClient {
+    require(requestTimeoutMillis > 0) { "Request timeout must be positive" }
+    return OkHttpClient.Builder()
+        .retryOnConnectionFailure(false)
+        .connectTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
+        .readTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
+        .writeTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
+        .callTimeout(requestTimeoutMillis, TimeUnit.MILLISECONDS)
+        .build()
+}
 
 fun Request.Builder.mimoApiKey(apiKey: String): Request.Builder {
     if (apiKey.isBlank()) {

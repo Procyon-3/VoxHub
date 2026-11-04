@@ -44,7 +44,7 @@ class VoiceCloneAudioStore(private val directory: File) {
 
     fun read(version: String, mime: String): ReferenceAudio {
         val target = file(version)
-        require(target.length() in 29L..7_500_028L)
+        require(target.length() >= 29L)
         val payload = target.readBytes()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, payload.copyOfRange(0, 12)))

@@ -19,7 +19,6 @@ import name.me.voxhub.core.tts.TtsVoice
 import name.me.voxhub.provider.mimo.protocol.MIMO_API_ENDPOINT
 import name.me.voxhub.provider.mimo.protocol.MimoSsePcmStream
 import name.me.voxhub.provider.mimo.protocol.MimoStreamProtocol
-import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
 import name.me.voxhub.provider.mimo.protocol.mimoApiKey
 import name.me.voxhub.provider.mimo.protocol.protocolError
 import name.me.voxhub.provider.mimo.protocol.requireSseBody
@@ -33,19 +32,9 @@ import okhttp3.coroutines.executeAsync
 
 data class MimoProviderConfig(val apiKey: String, val endpoint: String = MIMO_API_ENDPOINT)
 
-class MimoProviderFactory internal constructor(
-    requestTimeoutMillis: Long,
-    internal val client: OkHttpClient,
+class MimoProviderFactory(
+    private val client: OkHttpClient,
 ) {
-    constructor(requestTimeoutMillis: Long) : this(
-        requestTimeoutMillis,
-        createMimoHttpClient(requestTimeoutMillis),
-    )
-
-    init {
-        require(requestTimeoutMillis > 0) { "Request timeout must be positive" }
-    }
-
     fun create(config: MimoProviderConfig): TtsProvider = MimoTtsProvider(
         apiKey = config.apiKey,
         client = client,

@@ -21,6 +21,7 @@ import name.me.voxhub.domain.provider.VoiceDesignProviderConfigService
 import name.me.voxhub.domain.provider.VoiceDesignProviderFormData
 import name.me.voxhub.platform.audio.ImportedReferenceAudio
 import name.me.voxhub.platform.audio.ReferenceAudioPlayer
+import name.me.voxhub.platform.audio.ReferenceAudioTooLargeException
 
 sealed interface ProviderFormEvent {
     data class SavedNew(val id: name.me.voxhub.domain.model.ProviderConfigId, val activated: Boolean) : ProviderFormEvent
@@ -84,6 +85,9 @@ class ProviderFormViewModel(
                 val imported = importReferenceAudio(uri)
                 mutateClone { copy(referenceAudio = imported.audio, referenceAudioName = imported.displayName) }
             } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: ReferenceAudioTooLargeException) {
+                eventChannel.send(ProviderFormEvent.Message(R.string.reference_audio_too_large))
+            }
             catch (failure: Exception) {
                 Timber.e(failure, "Reference audio import failed")
                 eventChannel.send(ProviderFormEvent.Message(R.string.reference_import_failed))

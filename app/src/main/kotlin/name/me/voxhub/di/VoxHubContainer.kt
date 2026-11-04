@@ -32,6 +32,7 @@ import name.me.voxhub.feature.providers.ProviderViewModel
 import name.me.voxhub.feature.status.StatusViewModel
 import name.me.voxhub.platform.audio.PlaybackAudioSink
 import name.me.voxhub.platform.security.AndroidProviderCredentialCipher
+import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
 import name.me.voxhub.provider.mimo.tts.MIMO_DESCRIPTOR
 import name.me.voxhub.provider.mimo.tts.MimoProviderFactory
 import name.me.voxhub.provider.mimo.voiceclone.VOICECLONE_DESCRIPTOR
@@ -53,9 +54,10 @@ class VoxHubContainer(private val application: Application) {
     val configRepository = ProviderConfigRepository(application, applicationScope,
         AndroidProviderCredentialCipher(), VoiceCloneAudioStore(application))
     val mimoConfigRepository: MimoConfigRepository = configRepository
-    val mimoProviderFactory = MimoProviderFactory(REQUEST_TIMEOUT_MILLIS)
-    val voiceDesignProviderFactory = name.me.voxhub.provider.mimo.voicedesign.MimoVoiceDesignProviderFactory(REQUEST_TIMEOUT_MILLIS)
-    val voiceCloneProviderFactory = name.me.voxhub.provider.mimo.voiceclone.MimoVoiceCloneProviderFactory(REQUEST_TIMEOUT_MILLIS)
+    private val mimoHttpClient = createMimoHttpClient(REQUEST_TIMEOUT_MILLIS)
+    val mimoProviderFactory = MimoProviderFactory(mimoHttpClient)
+    val voiceDesignProviderFactory = name.me.voxhub.provider.mimo.voicedesign.MimoVoiceDesignProviderFactory(mimoHttpClient)
+    val voiceCloneProviderFactory = name.me.voxhub.provider.mimo.voiceclone.MimoVoiceCloneProviderFactory(mimoHttpClient)
     val providerCatalog = ProviderCatalog(
         buildList {
             add(MimoProviderRegistration(mimoProviderFactory))

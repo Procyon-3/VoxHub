@@ -94,6 +94,7 @@ dependencies {
     implementation(libs.logback.android)
     implementation(libs.slf4j)
     implementation(libs.sentry.android.core)
+    implementation(libs.okhttp.core)
     testImplementation(libs.junit)
     implementation(project(":core:tts"))
     implementation(project(":providers:mimo:protocol"))

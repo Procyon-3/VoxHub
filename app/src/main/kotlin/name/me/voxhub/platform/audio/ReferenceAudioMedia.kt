@@ -16,9 +16,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import name.me.voxhub.provider.mimo.voiceclone.MAX_REFERENCE_AUDIO_BYTES
 import name.me.voxhub.provider.mimo.voiceclone.ReferenceAudio
 
 class ImportedReferenceAudio(val audio: ReferenceAudio, val displayName: String)
+
+class ReferenceAudioTooLargeException : IllegalArgumentException()
 
 internal class MemoryAudioSource(private var bytes: ByteArray) : MediaDataSource() {
     @Synchronized override fun getSize(): Long = bytes.size.toLong()
@@ -44,6 +47,7 @@ class ReferenceAudioImporter(private val context: Context) {
                 currentCoroutineContext().ensureActive()
                 val count = input.read(buffer)
                 if (count < 0) break
+                if (count > MAX_REFERENCE_AUDIO_BYTES - output.size()) throw ReferenceAudioTooLargeException()
                 output.write(buffer, 0, count)
             }
             output.toByteArray()

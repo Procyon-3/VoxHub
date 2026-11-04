@@ -21,7 +21,6 @@ import name.me.voxhub.core.tts.TtsVoice
 import name.me.voxhub.provider.mimo.protocol.MIMO_API_ENDPOINT
 import name.me.voxhub.provider.mimo.protocol.MimoSsePcmStream
 import name.me.voxhub.provider.mimo.protocol.MimoStreamProtocol
-import name.me.voxhub.provider.mimo.protocol.createMimoHttpClient
 import name.me.voxhub.provider.mimo.protocol.mimoApiKey
 import name.me.voxhub.provider.mimo.protocol.protocolError
 import name.me.voxhub.provider.mimo.protocol.requireSseBody
@@ -33,6 +32,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.coroutines.executeAsync
 import okio.ByteString.Companion.toByteString
+
+const val MAX_REFERENCE_AUDIO_BYTES = 10_000_000
 
 class ReferenceAudio(bytes: ByteArray, val mimeType: String) {
     private val content = bytes.copyOf()
@@ -46,19 +47,9 @@ class ReferenceAudio(bytes: ByteArray, val mimeType: String) {
 }
 class MimoVoiceCloneProviderConfig(val apiKey: String, val referenceAudio: ReferenceAudio, val styleInstruction: String = "", val endpoint: String = MIMO_API_ENDPOINT)
 
-class MimoVoiceCloneProviderFactory internal constructor(
-    requestTimeoutMillis: Long,
-    internal val client: OkHttpClient,
+class MimoVoiceCloneProviderFactory(
+    private val client: OkHttpClient,
 ) {
-    constructor(requestTimeoutMillis: Long) : this(
-        requestTimeoutMillis,
-        createMimoHttpClient(requestTimeoutMillis),
-    )
-
-    init {
-        require(requestTimeoutMillis > 0) { "Request timeout must be positive" }
-    }
-
     fun create(config: MimoVoiceCloneProviderConfig): TtsProvider = VoiceCloneTtsProvider(
         apiKey = config.apiKey,
         referenceAudio = config.referenceAudio,
@@ -80,6 +71,9 @@ internal class VoiceCloneTtsProvider(
     override val voices: List<TtsVoice> = VOICECLONE_VOICES
 
     override suspend fun openPcmStream(request: TtsRequest): PcmStream {
+        if (referenceAudio.size > MAX_REFERENCE_AUDIO_BYTES) {
+            throw protocolError(TtsFailure.INVALID_REQUEST, TtsStage.REQUEST_VALIDATION, "REFERENCE_AUDIO_TOO_LARGE")
+        }
         val requestBody = withContext(Dispatchers.Default) {
             buildRequestBody(request.text, styleInstruction, referenceAudio)
                 .toString()
